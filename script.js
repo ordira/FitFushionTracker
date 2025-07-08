@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 2, goalType: 'runSessions', name: 'Run 3x a Week', target: 3, current: 0, unit: 'sessions', activityTypeFilter: 'Running' },
             { id: 3, goalType: 'weeklyCalories', name: 'Burn 2500 Calories', target: 2500, current: 0, unit: 'kcal this week', activityTypeFilter: null },
         ],
-        // Achievements now start as locked by default
         achievements: JSON.parse(localStorage.getItem('achievements')) || [
             { id: 1, name: 'First 5k', description: 'Completed your first 5 kilometer run!', unlocked: false, icon: '🏃' },
             { id: 2, name: '7-Day Streak', description: 'Worked out 7 days in a row!', unlocked: false, icon: '🔥' },
@@ -52,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- ACHIEVEMENT LOGIC ---
     const checkAchievements = (newActivity) => {
-        // --- 1. First 5k Achievement ---
         const first5k = state.achievements.find(ach => ach.id === 1);
         if (first5k && !first5k.unlocked) {
             if (newActivity.type === 'Running' && newActivity.distance >= 5) {
@@ -60,8 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Achievement Unlocked: First 5k! 🎉");
             }
         }
-
-        // --- 2. 7-Day Streak Achievement ---
         const sevenDayStreak = state.achievements.find(ach => ach.id === 2);
         if (sevenDayStreak && !sevenDayStreak.unlocked) {
             const uniqueWorkoutDays = [...new Set(state.activities.map(act => act.date))].sort();
@@ -73,24 +69,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     const nextDay = new Date(uniqueWorkoutDays[i+1]);
                     const diffTime = nextDay - currentDay;
                     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                    if (diffDays === 1) {
-                        consecutiveDays++;
-                    } else {
-                        consecutiveDays = 0;
-                    }
-                    if (consecutiveDays > maxStreak) {
-                        maxStreak = consecutiveDays;
-                    }
+                    if (diffDays === 1) consecutiveDays++;
+                    else consecutiveDays = 0;
+                    if (consecutiveDays > maxStreak) maxStreak = consecutiveDays;
                 }
-                // The streak is the number of connections, so add 1 to get the number of days
                 if ((maxStreak + 1) >= 7) {
                     sevenDayStreak.unlocked = true;
                     alert("Achievement Unlocked: 7-Day Streak! 🔥");
                 }
             }
         }
-
-        // --- 3. Early Bird Achievement ---
         const earlyBird = state.achievements.find(ach => ach.id === 3);
         if (earlyBird && !earlyBird.unlocked && newActivity.time) {
             const hour = parseInt(newActivity.time.split(':')[0]);
@@ -99,8 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Achievement Unlocked: Early Bird! ☀️");
             }
         }
-        
-        // You can add more achievement checks here, like the "Marathon Ready" one.
     };
 
     // --- RENDER FUNCTIONS ---
@@ -306,14 +292,12 @@ document.addEventListener('DOMContentLoaded', () => {
             form.querySelector('[name="distance"]').value = activityToEdit.distance || '';
             form.querySelector('[name="calories"]').value = activityToEdit.calories || '';
             form.querySelector('[name="date"]').value = activityToEdit.date;
-            // Also populate the time field if it exists on the activity
             form.querySelector('[name="time"]').value = activityToEdit.time || '';
         } else {
             state.editingActivityId = null;
             modalTitle.textContent = 'Log New Activity';
             submitBtn.textContent = 'Log Activity';
             form.querySelector('[name="date"]').value = getLocalISODateString(new Date());
-            // Set default time to current local time
             form.querySelector('[name="time"]').value = new Date().toTimeString().slice(0,5);
         }
         logActivityModal.classList.remove('hidden');
@@ -327,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
             distance: formData.get('distance') ? parseFloat(formData.get('distance')) : null,
             calories: formData.get('calories') ? parseInt(formData.get('calories')) : 0,
             date: formData.get('date'),
-            time: formData.get('time') // Get the new time value from the form
+            time: formData.get('time')
         };
         if (state.editingActivityId) {
             state.activities = state.activities.map(act => act.id === state.editingActivityId ? { ...act, ...activityData } : act);
@@ -335,9 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             activityData.id = Date.now();
             state.activities.push(activityData);
         }
-        // Check for new achievements based on this latest activity
         checkAchievements(activityData);
-
         recalculateGoalProgress();
         saveState();
         logActivityModal.classList.add('hidden');
@@ -346,7 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleResetActivities = () => {
         if (confirm("Are you sure you want to delete all logged activities? This action cannot be undone.")) {
             state.activities = [];
-            // Reset achievements as well
             state.achievements.forEach(ach => ach.unlocked = false);
             recalculateGoalProgress();
             saveState();
@@ -364,11 +345,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (target.classList.contains('delete-btn')) {
             if (confirm("Are you sure you want to delete this activity?")) {
                 state.activities = state.activities.filter(act => act.id !== activityId);
-                // After deleting, we need to re-check all achievements from scratch
                 recalculateGoalProgress();
-                // We'll also re-check achievements upon deletion in case it breaks a streak
-                state.achievements.forEach(ach => ach.unlocked = false); // Reset all
-                state.activities.forEach(act => checkAchievements(act)); // Re-check all
+                state.achievements.forEach(ach => ach.unlocked = false);
+                state.activities.forEach(act => checkAchievements(act));
                 saveState();
                 renderView();
             }
@@ -430,6 +409,19 @@ document.addEventListener('DOMContentLoaded', () => {
         saveState();
         renderView();
     };
+
+    // **** NEW FUNCTION: Handles clicking outside the modal ****
+    const handleModalOverlayClick = (e) => {
+        // If the click target is the modal overlay itself (not its children)
+        if (e.target === logActivityModal) {
+            logActivityModal.classList.add('hidden');
+        }
+        if (e.target === addGoalModal) {
+            addGoalModal.classList.add('hidden');
+        }
+    };
+    
+    // --- INITIALIZATION ---
     const init = () => {
         document.getElementById('bottom-nav').addEventListener('click', handleNavClick);
         fabLogActivity.addEventListener('click', () => showLogActivityModal());
@@ -438,12 +430,15 @@ document.addEventListener('DOMContentLoaded', () => {
         addGoalForm.addEventListener('submit', handleAddGoalSubmit);
         closeAddGoalModalBtn.addEventListener('click', () => addGoalModal.classList.add('hidden'));
         
-        // On initial load, re-check all achievements based on the stored activity list
-        state.achievements.forEach(ach => ach.unlocked = false); // Reset first
-        state.activities.forEach(act => checkAchievements(act)); // Then re-evaluate
-        
+        // **** NEW: Add event listeners for the modal overlays ****
+        logActivityModal.addEventListener('click', handleModalOverlayClick);
+        addGoalModal.addEventListener('click', handleModalOverlayClick);
+
+        state.achievements.forEach(ach => ach.unlocked = false);
+        state.activities.forEach(act => checkAchievements(act));
         recalculateGoalProgress();
         renderView();
     };
+
     init();
 });
